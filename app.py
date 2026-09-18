@@ -9,7 +9,7 @@ YOUTUBE_API_KEY = "AIzaSyAj_ZB8TOSQViO5MYQAfYEnf-T9LlcuFks"
 def index():
     return render_template('index.html')
 
-# ভিডিও সার্চ
+# ভিডিও সার্চ API
 @app.route('/search')
 def search():
     query = request.args.get('q', 'Bangla hit songs')
@@ -33,36 +33,45 @@ def search():
     except Exception as e:
         return jsonify({"videos": [], "nextPageToken": "", "error": str(e)})
 
-# সরাসরি ডাউনলোডের জন্য API
+# ওয়ার্কিং ডাইরেক্ট ডাউনলোডার
 @app.route('/get_download_stream')
 def get_download_stream():
-    video_url = request.args.get('url')
-    quality = request.args.get('quality', '720')
+    video_id = request.args.get('id')
+    quality = request.args.get('quality', '720p')
     
-    if not video_url:
-        return jsonify({"error": "Video URL missing"}), 400
+    if not video_id:
+        return jsonify({"status": "error", "message": "Video ID missing"}), 400
 
-    q_format = "720" if quality == "720p" else ("1080" if quality == "1080p" else "mp3")
-
-    # API Request to generate server stream
     try:
-        cobalt_api = "https://api.cobalt.tools/api/json"
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "url": video_url,
-            "vQuality": q_format,
-            "isAudioOnly": True if quality == 'mp3' else False
-        }
-        res = requests.post(cobalt_api, json=payload, headers=headers, timeout=10)
-        data = res.json()
-        
-        if "url" in data:
-            return jsonify({"status": "success", "download_url": data["url"]})
-        else:
-            return jsonify({"status": "error", "message": "Download limit reached or link invalid."}), 400
+        # YouTube direct stream extractor API
+        api_url = f"https://yt-download-api.vercel.app/api/download?id={video_id}"
+        response = requests.get(api_url, timeout=12)
+        res_data = response.json()
+
+        if res_data.get("status") == "success" or "formats" in res_data:
+            formats = res_data.get("formats", [])
+            download_url = None
+
+            if quality == 'mp3':
+                for fmt in formats:
+                    if fmt.get('isAudioOnly') or 'audio' in fmt.get('mimeType', ''):
+                        download_url = fmt.get('url')
+                        break
+            else:
+                target_height = 1080 if quality == '1080p' else 720
+                for fmt in formats:
+                    if fmt.get('height') == target_height and fmt.get('hasAudio', True):
+                        download_url = fmt.get('url')
+                        break
+            
+            if not download_url and len(formats) > 0:
+                download_url = formats[0].get('url')
+
+            if download_url:
+                return jsonify({"status": "success", "download_url": download_url})
+
+        return jsonify({"status": "error", "message": "Download link failed"}), 400
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
