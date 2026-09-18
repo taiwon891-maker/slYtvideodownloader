@@ -1,20 +1,15 @@
 import os
 import requests
-import yt_dlp
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
-DOWNLOAD_FOLDER = 'downloads'
 YOUTUBE_API_KEY = "AIzaSyAj_ZB8TOSQViO5MYQAfYEnf-T9LlcuFks"
-
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# ভিডিও সার্চ API
+# ভিডিও সার্চ
 @app.route('/search')
 def search():
     query = request.args.get('q', 'Bangla hit songs')
@@ -38,48 +33,38 @@ def search():
     except Exception as e:
         return jsonify({"videos": [], "nextPageToken": "", "error": str(e)})
 
-# ভিডিও ডাউনলোড
-@app.route('/download')
-def download():
+# সরাসরি ডাউনলোডের জন্য API
+@app.route('/get_download_stream')
+def get_download_stream():
     video_url = request.args.get('url')
-    quality = request.args.get('quality', '720p')
+    quality = request.args.get('quality', '720')
     
     if not video_url:
-        return "Video URL missing", 400
+        return jsonify({"error": "Video URL missing"}), 400
 
-    q_map = {
-        '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-        '720p': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-        'mp3': 'bestaudio/best'
-    }
+    q_format = "720" if quality == "720p" else ("1080" if quality == "1080p" else "mp3")
 
-    ydl_opts = {
-        'format': q_map.get(quality, 'best'),
-        'outtmpl': f'{DOWNLOAD_FOLDER}/%(title)s.%(ext)s',
-        'quiet': True
-    }
-    
-    if quality == 'mp3':
-        ydl_opts['postprocessors'] = [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
-
+    # API Request to generate server stream
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=True)
-            filename = ydl.prepare_filename(info)
-            if quality == 'mp3':
-                filename = filename.rsplit('.', 1)[0] + '.mp3'
-            return send_file(filename, as_attachment=True)
+        cobalt_api = "https://api.cobalt.tools/api/json"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "url": video_url,
+            "vQuality": q_format,
+            "isAudioOnly": True if quality == 'mp3' else False
+        }
+        res = requests.post(cobalt_api, json=payload, headers=headers, timeout=10)
+        data = res.json()
+        
+        if "url" in data:
+            return jsonify({"status": "success", "download_url": data["url"]})
+        else:
+            return jsonify({"status": "error", "message": "Download limit reached or link invalid."}), 400
     except Exception as e:
-        return f"Download Failed: {str(e)}", 500
-
-# সেভ হওয়া ডাউনলোডের তালিকা
-@app.route('/get_downloads')
-def get_downloads():
-    try:
-        files = os.listdir(DOWNLOAD_FOLDER)
-        return jsonify(files)
-    except Exception:
-        return jsonify([])
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
