@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Video Player</title>
+    <title>YouTube Player & Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -36,18 +36,17 @@
     <button onclick="filterCategory('Drama', this)" class="tag-btn bg-gray-100 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap">Drama</button>
     <button onclick="filterCategory('Music', this)" class="tag-btn bg-gray-100 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap">Music</button>
     <button onclick="filterCategory('Tech', this)" class="tag-btn bg-gray-100 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap">Tech</button>
-    <button onclick="filterCategory('News', this)" class="tag-btn bg-gray-100 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap">News</button>
 </nav>
 
-<!-- Main Container -->
+<!-- Main Area -->
 <main class="max-w-4xl mx-auto p-2">
 
-    <!-- Home Section -->
+    <!-- Home Feed -->
     <section id="home-sec">
         <div id="video-feed" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </section>
 
-    <!-- Playing Section (Includes Video + Dynamic List Below) -->
+    <!-- Video Playing + Suggestions -->
     <section id="playing-sec" class="hidden">
         <div class="sticky top-14 bg-black z-30 rounded-xl overflow-hidden shadow-md">
             <div class="aspect-video w-full">
@@ -56,27 +55,18 @@
             <div class="p-3 bg-white border-b">
                 <h1 id="playTitle" class="text-sm font-bold line-clamp-2">Loading...</h1>
                 <p id="playChannel" class="text-xs text-gray-500 mt-1"></p>
-                <div class="flex gap-2 mt-3">
-                    <button onclick="startDownload('1080p')" class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 1080p</button>
-                    <button onclick="startDownload('720p')" class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 720p</button>
-                    <button onclick="startDownload('mp3')" class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-music me-1"></i> MP3</button>
+                <div class="flex gap-2 mt-3" id="dl-buttons">
+                    <button onclick="startDirectDownload('1080p')" class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 1080p</button>
+                    <button onclick="startDirectDownload('720p')" class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 720p</button>
+                    <button onclick="startDirectDownload('mp3')" class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-music me-1"></i> MP3</button>
                 </div>
             </div>
         </div>
 
-        <!-- Related Videos below Player -->
         <div class="mt-4">
-            <h2 class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider px-1">Up Next / Suggested Videos</h2>
+            <h2 class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider px-1">Suggested Videos</h2>
             <div id="related-feed" class="space-y-3"></div>
         </div>
-    </section>
-
-    <!-- Download Section -->
-    <section id="download-sec" class="hidden">
-        <h2 class="font-bold text-md mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-folder-open text-red-600"></i> Downloads
-        </h2>
-        <div id="download-list" class="space-y-2"></div>
     </section>
 
     <!-- Loader -->
@@ -86,7 +76,7 @@
 
 </main>
 
-<!-- Bottom Nav -->
+<!-- Bottom Navigation -->
 <footer class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-2 z-50">
     <button onclick="showSection('home')" id="nav-home" class="flex flex-col items-center text-red-600">
         <i class="fa-solid fa-house text-lg"></i>
@@ -95,10 +85,6 @@
     <button onclick="loadShorts()" id="nav-shorts" class="flex flex-col items-center text-gray-600">
         <i class="fa-solid fa-bolt text-lg"></i>
         <span class="text-[10px] mt-0.5">Shorts</span>
-    </button>
-    <button onclick="showSection('download')" id="nav-download" class="flex flex-col items-center text-gray-600">
-        <i class="fa-solid fa-download text-lg"></i>
-        <span class="text-[10px] mt-0.5">Download</span>
     </button>
 </footer>
 
@@ -109,7 +95,6 @@
     let isLoading = false;
     let activeTab = "home";
 
-    //১. ভিডিও ফেচ করার প্রধান ফাংশন
     async function loadVideos(q, append = false, targetFeedId = 'video-feed') {
         if (isLoading) return;
         isLoading = true;
@@ -127,7 +112,6 @@
                     const cleanTitle = v.title.replace(/'/g, "");
                     
                     if (targetFeedId === 'related-feed') {
-                        // প্লেয়ারের নিচের সাইড-বাই-সাইড লিস্ট
                         feed.innerHTML += `
                             <div class="flex gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg" onclick="playThis('${v.url}', '${v.videoId}', '${cleanTitle}', '${v.channel}')">
                                 <img src="${v.thumbnail}" class="w-32 aspect-video object-cover rounded-md flex-shrink-0">
@@ -137,7 +121,6 @@
                                 </div>
                             </div>`;
                     } else {
-                        // হোম ফিড কার্ড
                         feed.innerHTML += `
                             <div class="cursor-pointer group" onclick="playThis('${v.url}', '${v.videoId}', '${cleanTitle}', '${v.channel}')">
                                 <div class="aspect-video rounded-lg overflow-hidden bg-gray-100">
@@ -165,7 +148,6 @@
         isLoading = false;
     }
 
-    // ২. ভিডিও প্লে করা এবং নিচে আরও ভিডিও লোড করা
     function playThis(url, videoId, title, channel) {
         playingUrl = url;
         showSection('playing');
@@ -175,32 +157,23 @@
         document.getElementById('mainPlayer').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        // ভিডিও চালু করার পর নিচে রিলেটেড ভিডিও দেখানো
         nextPageToken = "";
         loadVideos(title, false, 'related-feed');
     }
 
-    // ৩. সেকশন পরিবর্তন
     function showSection(name) {
         activeTab = name;
         document.getElementById('home-sec').classList.add('hidden');
         document.getElementById('playing-sec').classList.add('hidden');
-        document.getElementById('download-sec').classList.add('hidden');
 
         document.getElementById('nav-home').className = "flex flex-col items-center text-gray-600";
         document.getElementById('nav-shorts').className = "flex flex-col items-center text-gray-600";
-        document.getElementById('nav-download').className = "flex flex-col items-center text-gray-600";
 
         if (name === 'home') {
             document.getElementById('home-sec').classList.remove('hidden');
             document.getElementById('nav-home').className = "flex flex-col items-center text-red-600";
         } else if (name === 'playing') {
             document.getElementById('playing-sec').classList.remove('hidden');
-        } else if (name === 'download') {
-            document.getElementById('download-sec').classList.remove('hidden');
-            document.getElementById('nav-download').className = "flex flex-col items-center text-red-600";
-            loadDownloadFiles();
         }
     }
 
@@ -232,20 +205,35 @@
         loadVideos(currentQuery);
     }
 
-    function startDownload(quality) {
-        if (!playingUrl) return alert("ভিডিও পাওয়া যায়নি!");
-        alert("ডাউনলোড প্রসেস হচ্ছে...");
-        window.location.href = `/download?url=${encodeURIComponent(playingUrl)}&quality=${quality}`;
-    }
+    // সরাসরি ব্রাউজার দিয়ে ভিডিও ফাইল ডাউনলোড
+    async function startDirectDownload(quality) {
+        if (!playingUrl) return alert("ভিডিও লিংকে সমস্যা আছে!");
 
-    async function loadDownloadFiles() {
-        const res = await fetch('/get_downloads');
-        const files = await res.json();
-        const list = document.getElementById('download-list');
-        list.innerHTML = files.length ? "" : "<p class='text-gray-400 text-xs text-center py-6'>কোন ডাউনলোড পাওয়া যায়নি</p>";
-        files.forEach(f => {
-            list.innerHTML += `<div class="p-2.5 bg-gray-50 rounded border text-xs truncate flex items-center gap-2"><i class="fa-solid fa-file-video text-red-500"></i>${f}</div>`;
-        });
+        const btnBox = document.getElementById('dl-buttons');
+        const oldContent = btnBox.innerHTML;
+        btnBox.innerHTML = `<span class="text-xs text-red-600 font-bold"><i class="fa-solid fa-spinner fa-spin me-1"></i> Generating File Link...</span>`;
+
+        try {
+            const res = await fetch(`/get_download_stream?url=${encodeURIComponent(playingUrl)}&quality=${quality}`);
+            const data = await res.json();
+            
+            btnBox.innerHTML = oldContent;
+
+            if (data.status === "success" && data.download_url) {
+                // ব্রাউজারে ফাইল সেভ করা
+                const a = document.createElement('a');
+                a.href = data.download_url;
+                a.download = '';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                alert("ডাউনলোড লিংক তৈরি করা যায়নি। আবার চেষ্টা করুন।");
+            }
+        } catch (e) {
+            btnBox.innerHTML = oldContent;
+            alert("Error: " + e.message);
+        }
     }
 
     function resetFeed() {
@@ -256,7 +244,6 @@
         loadVideos(currentQuery);
     }
 
-    // ৪. স্মুথ এবং অটোমেটিক আনলিমিটেড স্ক্রলিং (Unlimited Scroll Up/Down)
     window.onscroll = () => {
         if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
             if (nextPageToken && !isLoading) {
