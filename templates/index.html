@@ -30,7 +30,7 @@
     </div>
 </header>
 
-<!-- Filter Tabs -->
+<!-- Category Tabs -->
 <nav class="flex space-x-2 px-3 py-2 overflow-x-auto scrollbar-hide border-b border-gray-100 sticky top-14 bg-white z-40">
     <button onclick="filterCategory('All', this)" class="tag-btn active bg-gray-100 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap">All</button>
     <button onclick="filterCategory('Drama', this)" class="tag-btn bg-gray-100 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap">Drama</button>
@@ -56,14 +56,14 @@
                 <h1 id="playTitle" class="text-sm font-bold line-clamp-2">Loading...</h1>
                 <p id="playChannel" class="text-xs text-gray-500 mt-1"></p>
                 <div class="flex gap-2 mt-3" id="dl-buttons">
-                    <button onclick="startDirectDownload('1080p')" class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 1080p</button>
-                    <button onclick="startDirectDownload('720p')" class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 720p</button>
-                    <button onclick="startDirectDownload('mp3')" class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-music me-1"></i> MP3</button>
+                    <button onclick="downloadClient('1080')" class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 1080p</button>
+                    <button onclick="downloadClient('720')" class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 720p</button>
+                    <button onclick="downloadClient('mp3')" class="bg-gray-800 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-music me-1"></i> MP3</button>
                 </div>
             </div>
         </div>
 
-        <!-- Related Videos below Player -->
+        <!-- Dynamic Related Videos -->
         <div class="mt-4">
             <h2 class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider px-1">Up Next / Suggested Videos</h2>
             <div id="related-feed" class="space-y-3"></div>
@@ -92,7 +92,7 @@
 <script>
     let nextPageToken = "";
     let currentQuery = "Bangla new songs";
-    let playingUrl = "";
+    let currentVideoId = "";
     let isLoading = false;
     let activeTab = "home";
 
@@ -114,7 +114,7 @@
                     
                     if (targetFeedId === 'related-feed') {
                         feed.innerHTML += `
-                            <div class="flex gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg" onclick="playThis('${v.url}', '${v.videoId}', '${cleanTitle}', '${v.channel}')">
+                            <div class="flex gap-2 cursor-pointer bg-gray-50 p-2 rounded-lg" onclick="playThis('${v.videoId}', '${cleanTitle}', '${v.channel}')">
                                 <img src="${v.thumbnail}" class="w-32 aspect-video object-cover rounded-md flex-shrink-0">
                                 <div class="overflow-hidden">
                                     <h3 class="font-semibold text-xs line-clamp-2 text-gray-800">${v.title}</h3>
@@ -123,7 +123,7 @@
                             </div>`;
                     } else {
                         feed.innerHTML += `
-                            <div class="cursor-pointer group" onclick="playThis('${v.url}', '${v.videoId}', '${cleanTitle}', '${v.channel}')">
+                            <div class="cursor-pointer group" onclick="playThis('${v.videoId}', '${cleanTitle}', '${v.channel}')">
                                 <div class="aspect-video rounded-lg overflow-hidden bg-gray-100">
                                     <img src="${v.thumbnail}" class="w-full h-full object-cover">
                                 </div>
@@ -149,8 +149,8 @@
         isLoading = false;
     }
 
-    function playThis(url, videoId, title, channel) {
-        playingUrl = url;
+    function playThis(videoId, title, channel) {
+        currentVideoId = videoId;
         showSection('playing');
 
         document.getElementById('playTitle').innerText = title;
@@ -207,30 +207,14 @@
         loadVideos(currentQuery);
     }
 
-    async function startDirectDownload(quality) {
-        if (!playingUrl) return alert("ভিডিও লিংকে সমস্যা আছে!");
-
-        const videoId = playingUrl.split('v=')[1];
-        const btnBox = document.getElementById('dl-buttons');
-        const oldContent = btnBox.innerHTML;
+    // ক্লায়েন্ট-সাইড ডাইরেক্ট ডাউনলোডার
+    function downloadClient(format) {
+        if (!currentVideoId) return alert("ভিডিও পাওয়া যায়নি!");
+        const videoUrl = `https://www.youtube.com/watch?v=${currentVideoId}`;
         
-        btnBox.innerHTML = `<span class="text-xs text-red-600 font-bold"><i class="fa-solid fa-spinner fa-spin me-1"></i> Generating File Link...</span>`;
-
-        try {
-            const res = await fetch(`/get_download_stream?id=${videoId}&quality=${quality}`);
-            const data = await res.json();
-            
-            btnBox.innerHTML = oldContent;
-
-            if (data.status === "success" && data.download_url) {
-                window.open(data.download_url, '_blank');
-            } else {
-                alert("ডাউনলোড লিংক তৈরি করা যায়নি। অন্য ভিডিও চেষ্টা করুন।");
-            }
-        } catch (e) {
-            btnBox.innerHTML = oldContent;
-            alert("Error: " + e.message);
-        }
+        // ক্লায়েন্ট আইপি ব্যবহার করে ডাইরেক্ট ইমপ্লিমেন্টেশন
+        const downloadGateway = `https://loader.to/api/card/?url=${encodeURIComponent(videoUrl)}&f=${format}`;
+        window.open(downloadGateway, '_blank');
     }
 
     function resetFeed() {
@@ -241,7 +225,7 @@
         loadVideos(currentQuery);
     }
 
-    // Unlimited Scroll Handler
+    // আনলিমিটেড স্ক্রলিং
     window.onscroll = () => {
         if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
             if (nextPageToken && !isLoading) {
