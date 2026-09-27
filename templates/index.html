@@ -49,22 +49,21 @@
     <!-- Playing Section -->
     <section id="playing-sec" class="hidden">
         <div class="sticky top-14 bg-black z-30 rounded-xl overflow-hidden shadow-md">
-            <div class="aspect-video w-full relative">
-                <iframe id="mainPlayer" class="w-full h-full" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            <div class="aspect-video w-full bg-black flex items-center justify-center relative">
+                <!-- HTML5 Native Video Player -->
+                <video id="html5Player" class="w-full h-full hidden" controls autoplay></video>
+                <!-- Backup iframe -->
+                <iframe id="iframePlayer" class="w-full h-full hidden" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                
+                <!-- Player Loading State -->
+                <div id="playerLoader" class="text-white text-xs flex flex-col items-center gap-2">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl text-red-600"></i>
+                    <span>Loading Video Stream...</span>
+                </div>
             </div>
             <div class="p-3 bg-white border-b">
                 <h1 id="playTitle" class="text-sm font-bold line-clamp-2">Loading...</h1>
                 <p id="playChannel" class="text-xs text-gray-500 mt-1"></p>
-
-                <!-- Embed Restriction Bypass Options -->
-                <div class="flex items-center gap-2 mt-2">
-                    <button onclick="switchProxyPlayer()" class="bg-amber-50 text-amber-800 text-[11px] px-3 py-1 rounded border border-amber-300 font-semibold flex items-center gap-1">
-                        <i class="fa-solid fa-arrows-rotate text-xs"></i> প্লে না হলে প্লেয়ার ফিক্স করুন (Proxy)
-                    </button>
-                    <a id="ytDirectBtn" href="#" target="_blank" class="bg-gray-100 text-gray-700 text-[11px] px-3 py-1 rounded border border-gray-300 font-semibold flex items-center gap-1">
-                        <i class="fa-brands fa-youtube text-red-600 text-xs"></i> YouTube-এ প্লে করুন
-                    </a>
-                </div>
 
                 <div class="flex gap-2 mt-3" id="dl-buttons">
                     <button onclick="downloadClient('1080')" class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 1080p</button>
@@ -106,7 +105,6 @@
     let currentVideoId = "";
     let isLoading = false;
     let activeTab = "home";
-    let proxyMode = false;
 
     async function loadVideos(q, append = false, targetFeedId = 'video-feed') {
         if (isLoading) return;
@@ -161,35 +159,48 @@
         isLoading = false;
     }
 
-    function playThis(videoId, title, channel) {
+    async function playThis(videoId, title, channel) {
         currentVideoId = videoId;
-        proxyMode = false;
         showSection('playing');
 
         document.getElementById('playTitle').innerText = title;
         document.getElementById('playChannel').innerText = channel || 'YouTube Channel';
-        document.getElementById('ytDirectBtn').href = `https://www.youtube.com/watch?v=${videoId}`;
 
-        // Standard Embed Player
-        document.getElementById('mainPlayer').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`;
-        
+        const videoElem = document.getElementById('html5Player');
+        const iframeElem = document.getElementById('iframePlayer');
+        const loaderElem = document.getElementById('playerLoader');
+
+        videoElem.classList.add('hidden');
+        iframeElem.classList.add('hidden');
+        loaderElem.classList.remove('hidden');
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        try {
+            // ১. ব্যাকএন্ড থেকে ডাইরেক্ট ভিডিও স্ট্রিম আনার চেষ্টা
+            const res = await fetch(`/get_stream?id=${videoId}`);
+            const data = await res.json();
+
+            loaderElem.classList.add('hidden');
+
+            if (data.status === 'success' && data.stream_url) {
+                // কাস্টম এইচটিএমএল৫ ভিডিও প্লেয়ার দিয়ে চালানো
+                videoElem.src = data.stream_url;
+                videoElem.classList.remove('hidden');
+                videoElem.play();
+            } else {
+                // ব্যাকআপঃ আইফ্রেমে লোড করা
+                iframeElem.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+                iframeElem.classList.remove('hidden');
+            }
+        } catch (e) {
+            loaderElem.classList.add('hidden');
+            iframeElem.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+            iframeElem.classList.remove('hidden');
+        }
 
         nextPageToken = "";
         loadVideos(title, false, 'related-feed');
-    }
-
-    // Embed Restricted ভিডিও চালানোর জন্য ইনভিডিয়াস প্রক্সি প্লেয়ার সুইচ
-    function switchProxyPlayer() {
-        if (!currentVideoId) return;
-        const player = document.getElementById('mainPlayer');
-        if (!proxyMode) {
-            player.src = `https://yewtu.be/embed/${currentVideoId}?autoplay=1`;
-            proxyMode = true;
-        } else {
-            player.src = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1`;
-            proxyMode = false;
-        }
     }
 
     function showSection(name) {
@@ -244,7 +255,8 @@
     }
 
     function resetFeed() {
-        document.getElementById('mainPlayer').src = "";
+        document.getElementById('html5Player').pause();
+        document.getElementById('iframePlayer').src = "";
         currentQuery = "Bangla new songs";
         nextPageToken = "";
         showSection('home');
