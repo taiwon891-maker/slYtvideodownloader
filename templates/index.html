@@ -55,13 +55,15 @@
             <div class="p-3 bg-white border-b">
                 <h1 id="playTitle" class="text-sm font-bold line-clamp-2">Loading...</h1>
                 <p id="playChannel" class="text-xs text-gray-500 mt-1"></p>
-                
-                <!-- Player Fallback Button for Disabled Embeds -->
-                <div id="embed-warning" class="mt-2 hidden">
-                    <button onclick="switchPlayer()" class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded border border-amber-300 w-full text-left flex items-center justify-between">
-                        <span><i class="fa-solid fa-triangle-exclamation me-1"></i> ভিডিও প্লে না হলে প্লেয়ার মোড পরিবর্তন করুন</span>
-                        <span class="font-bold underline">Switch</span>
+
+                <!-- Embed Restriction Bypass Options -->
+                <div class="flex items-center gap-2 mt-2">
+                    <button onclick="switchProxyPlayer()" class="bg-amber-50 text-amber-800 text-[11px] px-3 py-1 rounded border border-amber-300 font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-arrows-rotate text-xs"></i> প্লে না হলে প্লেয়ার ফিক্স করুন (Proxy)
                     </button>
+                    <a id="ytDirectBtn" href="#" target="_blank" class="bg-gray-100 text-gray-700 text-[11px] px-3 py-1 rounded border border-gray-300 font-semibold flex items-center gap-1">
+                        <i class="fa-brands fa-youtube text-red-600 text-xs"></i> YouTube-এ প্লে করুন
+                    </a>
                 </div>
 
                 <div class="flex gap-2 mt-3" id="dl-buttons">
@@ -104,7 +106,7 @@
     let currentVideoId = "";
     let isLoading = false;
     let activeTab = "home";
-    let isAltPlayer = false;
+    let proxyMode = false;
 
     async function loadVideos(q, append = false, targetFeedId = 'video-feed') {
         if (isLoading) return;
@@ -161,15 +163,15 @@
 
     function playThis(videoId, title, channel) {
         currentVideoId = videoId;
-        isAltPlayer = false;
+        proxyMode = false;
         showSection('playing');
 
         document.getElementById('playTitle').innerText = title;
         document.getElementById('playChannel').innerText = channel || 'YouTube Channel';
-        document.getElementById('embed-warning').classList.remove('hidden');
+        document.getElementById('ytDirectBtn').href = `https://www.youtube.com/watch?v=${videoId}`;
 
-        // Bypassing Embedding Restrictions using nocookie + parameters
-        document.getElementById('mainPlayer').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
+        // Standard Embed Player
+        document.getElementById('mainPlayer').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`;
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -177,16 +179,16 @@
         loadVideos(title, false, 'related-feed');
     }
 
-    // প্লেব্যাক রেস্ট্রিকশনের জন্য অল্টারনেটিভ প্লেয়ার সার্ভিস সুইচিং
-    function switchPlayer() {
+    // Embed Restricted ভিডিও চালানোর জন্য ইনভিডিয়াস প্রক্সি প্লেয়ার সুইচ
+    function switchProxyPlayer() {
         if (!currentVideoId) return;
-        const iframe = document.getElementById('mainPlayer');
-        if (!isAltPlayer) {
-            iframe.src = `https://www.youtube.com/embed/${currentVideoId}?origin=${window.location.origin}`;
-            isAltPlayer = true;
+        const player = document.getElementById('mainPlayer');
+        if (!proxyMode) {
+            player.src = `https://yewtu.be/embed/${currentVideoId}?autoplay=1`;
+            proxyMode = true;
         } else {
-            iframe.src = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1`;
-            isAltPlayer = false;
+            player.src = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1`;
+            proxyMode = false;
         }
     }
 
@@ -234,7 +236,6 @@
         loadVideos(currentQuery);
     }
 
-    // ক্লায়েন্ট-সাইড ডাইরেক্ট ডাউনলোডার
     function downloadClient(format) {
         if (!currentVideoId) return alert("ভিডিও পাওয়া যায়নি!");
         const videoUrl = `https://www.youtube.com/watch?v=${currentVideoId}`;
@@ -250,7 +251,6 @@
         loadVideos(currentQuery);
     }
 
-    // আনলিমিটেড স্ক্রলিং
     window.onscroll = () => {
         if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
             if (nextPageToken && !isLoading) {
