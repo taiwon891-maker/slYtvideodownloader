@@ -33,6 +33,33 @@ def search():
     except Exception as e:
         return jsonify({"videos": [], "nextPageToken": "", "error": str(e)})
 
+# সরাসরি স্ট্রিম ইউআরএল বের করার এপিআই (ইমবেড ব্লক বাইপাস)
+@app.route('/get_stream')
+def get_stream():
+    video_id = request.args.get('id')
+    if not video_id:
+        return jsonify({"status": "error", "message": "Video ID missing"}), 400
+
+    try:
+        # Piped API থেকে ভিডিও স্ট্রিম রিট্রাইভ
+        piped_url = f"https://pipedapi.kavin.rocks/streams/{video_id}"
+        r = requests.get(piped_url, timeout=10)
+        data = r.json()
+
+        stream_url = None
+        # ভিডিও স্ট্রিম খোঁজা
+        for stream in data.get('videoStreams', []):
+            if stream.get('videoOnly') == False and stream.get('url'):
+                stream_url = stream.get('url')
+                break
+
+        if stream_url:
+            return jsonify({"status": "success", "stream_url": stream_url})
+        else:
+            return jsonify({"status": "error", "message": "Stream not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
     
