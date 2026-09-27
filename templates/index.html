@@ -49,12 +49,21 @@
     <!-- Playing Section -->
     <section id="playing-sec" class="hidden">
         <div class="sticky top-14 bg-black z-30 rounded-xl overflow-hidden shadow-md">
-            <div class="aspect-video w-full">
+            <div class="aspect-video w-full relative">
                 <iframe id="mainPlayer" class="w-full h-full" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
             </div>
             <div class="p-3 bg-white border-b">
                 <h1 id="playTitle" class="text-sm font-bold line-clamp-2">Loading...</h1>
                 <p id="playChannel" class="text-xs text-gray-500 mt-1"></p>
+                
+                <!-- Player Fallback Button for Disabled Embeds -->
+                <div id="embed-warning" class="mt-2 hidden">
+                    <button onclick="switchPlayer()" class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded border border-amber-300 w-full text-left flex items-center justify-between">
+                        <span><i class="fa-solid fa-triangle-exclamation me-1"></i> ভিডিও প্লে না হলে প্লেয়ার মোড পরিবর্তন করুন</span>
+                        <span class="font-bold underline">Switch</span>
+                    </button>
+                </div>
+
                 <div class="flex gap-2 mt-3" id="dl-buttons">
                     <button onclick="downloadClient('1080')" class="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 1080p</button>
                     <button onclick="downloadClient('720')" class="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium"><i class="fa-solid fa-download me-1"></i> 720p</button>
@@ -95,6 +104,7 @@
     let currentVideoId = "";
     let isLoading = false;
     let activeTab = "home";
+    let isAltPlayer = false;
 
     async function loadVideos(q, append = false, targetFeedId = 'video-feed') {
         if (isLoading) return;
@@ -151,16 +161,33 @@
 
     function playThis(videoId, title, channel) {
         currentVideoId = videoId;
+        isAltPlayer = false;
         showSection('playing');
 
         document.getElementById('playTitle').innerText = title;
         document.getElementById('playChannel').innerText = channel || 'YouTube Channel';
-        document.getElementById('mainPlayer').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+        document.getElementById('embed-warning').classList.remove('hidden');
+
+        // Bypassing Embedding Restrictions using nocookie + parameters
+        document.getElementById('mainPlayer').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
         nextPageToken = "";
         loadVideos(title, false, 'related-feed');
+    }
+
+    // প্লেব্যাক রেস্ট্রিকশনের জন্য অল্টারনেটিভ প্লেয়ার সার্ভিস সুইচিং
+    function switchPlayer() {
+        if (!currentVideoId) return;
+        const iframe = document.getElementById('mainPlayer');
+        if (!isAltPlayer) {
+            iframe.src = `https://www.youtube.com/embed/${currentVideoId}?origin=${window.location.origin}`;
+            isAltPlayer = true;
+        } else {
+            iframe.src = `https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1`;
+            isAltPlayer = false;
+        }
     }
 
     function showSection(name) {
@@ -211,8 +238,6 @@
     function downloadClient(format) {
         if (!currentVideoId) return alert("ভিডিও পাওয়া যায়নি!");
         const videoUrl = `https://www.youtube.com/watch?v=${currentVideoId}`;
-        
-        // ক্লায়েন্ট আইপি ব্যবহার করে ডাইরেক্ট ইমপ্লিমেন্টেশন
         const downloadGateway = `https://loader.to/api/card/?url=${encodeURIComponent(videoUrl)}&f=${format}`;
         window.open(downloadGateway, '_blank');
     }
