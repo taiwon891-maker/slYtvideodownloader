@@ -1,65 +1,88 @@
 import os
+import json
 import requests
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 
 app = Flask(__name__)
+app.secret_key = 'super_secret_admin_key_123'  # সেশন সিকিউরিটির জন্য
+
 YOUTUBE_API_KEY = "AIzaSyAj_ZB8TOSQViO5MYQAfYEnf-T9LlcuFks"
+SETTINGS_FILE = "settings.json"
+
+# অ্যাডমিন লগইন তথ্য
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin123"
+
+def load_settings():
+    if not os.path.exists(SETTINGS_FILE):
+        default_settings = {
+            "adsterra_head_script": "<!-- Adsterra Head Script -->",
+            "adsterra_banner_script": "<!-- Adsterra Banner Script -->",
+            "custom_header_title": "YouTube Player & Downloader"
+        }
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_settings, f, ensure_ascii=False, indent=4)
+        return default_settings
+    with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+        return jsonঅ্যাডমিন প্যানেল, ডায়নামিক অ্যাডস সেটিংস ও ইউটিউব সার্চ ফিচারসহ সম্পূর্ণ `app.py` ফাইলের কোড নিচে দেওয়া হলো:
+
+```python
+import os
+import json
+import requests
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+
+app = Flask(__name__)
+# সেশনের জন্য সিক্রেট কি
+app.secret_key = 'super_secret_admin_key_123'
+
+# ইউটিউব এপিআই কি
+YOUTUBE_API_KEY = "AIzaSyAj_ZB8TOSQViO5MYQAfYEnf-T9LlcuFks"
+SETTINGS_FILE = "settings.json"
+
+# অ্যাডমিন লগইন তথ্য
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin123"
+
+def load_settings():
+    """সেটিংস ফাইল লোড করা"""
+    if not os.path.exists(SETTINGS_FILE):
+        default_settings = {
+            "adsterra_head_script": "<!-- Adsterra Head Script -->",
+            "adsterra_banner_script": "<!-- Adsterra Banner Script -->",
+            "custom_header_title": "YouTube Player & Downloader"
+        }
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_settings, f, ensure_ascii=False, indent=4)
+        return default_settings
+    
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {
+            "adsterra_head_script": "",
+            "adsterra_banner_script": "",
+            "custom_header_title": "YouTube Player & Downloader"
+        }
+
+def save_settings(data):
+    """সেটিংস ফাইলে ডাটা সেভ করা"""
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """মূল হোম পেজ"""
+    settings = load_settings()
+    return render_template('index.html', settings=settings)
 
-# ইউটিউব সার্চ এপিআই
 @app.route('/search')
 def search():
+    """ইউটিউব সার্চ এপিআই রুট"""
     query = request.args.get('q', 'Bangla hit songs')
     page_token = request.args.get('pageToken', '')
-    url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=12&q={query}&type=video&pageToken={page_token}&key={YOUTUBE_API_KEY}"
+    url = f"[https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=12&q=](https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=12&q=){query}&type=video&pageToken={page_token}&key={YOUTUBE_API_KEY}"
     
-    try:
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        videos = []
-        for item in data.get('items', []):
-            if 'snippet' in item and 'videoId' in item.get('id', {}):
-                videos.append({
-                    "title": item['snippet']['title'],
-                    "thumbnail": item['snippet']['thumbnails']['high']['url'],
-                    "url": f"https://www.youtube.com/watch?v={item['id']['videoId']}",
-                    "videoId": item['id']['videoId'],
-                    "channel": item['snippet']['channelTitle']
-                })
-        return jsonify({"videos": videos, "nextPageToken": data.get('nextPageToken', '')})
-    except Exception as e:
-        return jsonify({"videos": [], "nextPageToken": "", "error": str(e)})
 
-# সরাসরি স্ট্রিম ইউআরএল বের করার এপিআই (ইমবেড ব্লক বাইপাস)
-@app.route('/get_stream')
-def get_stream():
-    video_id = request.args.get('id')
-    if not video_id:
-        return jsonify({"status": "error", "message": "Video ID missing"}), 400
-
-    try:
-        # Piped API থেকে ভিডিও স্ট্রিম রিট্রাইভ
-        piped_url = f"https://pipedapi.kavin.rocks/streams/{video_id}"
-        r = requests.get(piped_url, timeout=10)
-        data = r.json()
-
-        stream_url = None
-        # ভিডিও স্ট্রিম খোঁজা
-        for stream in data.get('videoStreams', []):
-            if stream.get('videoOnly') == False and stream.get('url'):
-                stream_url = stream.get('url')
-                break
-
-        if stream_url:
-            return jsonify({"status": "success", "stream_url": stream_url})
-        else:
-            return jsonify({"status": "error", "message": "Stream not found"}), 404
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
     
